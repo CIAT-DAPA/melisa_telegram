@@ -1,0 +1,17 @@
+# Enviroment
+/env
+
+# Data
+/data
+
+# Python
+src/Python/__pycache__
+*.__pycache__
+*.pyc
+
+# Secrets
+/token.txt
+/token_old.txt
+/token_demeter.txt
+
+/notes.txt
