@@ -1,8 +1,10 @@
 # Enviroment
 /env
+/telegram-melisa-env2
 
 # Data
 /data
+/images
 
 # Python
 src/Python/__pycache__
