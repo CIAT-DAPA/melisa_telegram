@@ -23,44 +23,73 @@ BOT_USER_NAME = "Melisa_chatbot"
 bot = None
 
 # Función que maneja las imágenes
-def handle_image(update, context):
+
+
+def handle_image(update, sender_id, ext_id, context):
     try:
         # Verifica si el mensaje contiene una foto
         print("Mensaje de foto recibido")
-        if update.message.photo:
-            # Obtiene el objeto de la foto más grande
-            photo = update.message.photo[-1]
 
-            # Obtiene el identificador único del usuario
-            user_id = update.message.from_user.id
+        # Obtiene el objeto de la foto más grande
+        photo = update.message.photo[-1]
 
-            # Genera un nombre único para la imagen basado en un UUID
-            file_id = str(uuid.uuid4())
+        # Obtiene el identificador único del usuario
+        user_id = update.message.from_user.id
 
-            # Obtiene la fecha actual en formato YYYYMMDD
-            date_today = datetime.now().strftime("%Y%m%d")
+        # Toma el nombre como lo nombra Telegram
+        file_name = photo.get_file().file_path.split("/")[-1]
+        file_extension = file_name.split('.')[-1]
+        print(file_extension)
 
-            # Crea el directorio si no existe
-            user_dir = os.path.join(".//images", date_today, str(user_id))
-            os.makedirs(user_dir, exist_ok=True)
+        # Obtiene la fecha actual en formato YYYYMMDD
+        date_today = datetime.now().strftime("%Y%m%d")
 
-            # Guarda la imagen en el directorio correspondiente
-            file_path = os.path.join(user_dir, f"{file_id}.jpg")
-            photo.get_file().download(file_path)
+        # Crea el directorio si no existe
+        user_dir = os.path.join(".//images", date_today, str(user_id))
+        os.makedirs(user_dir, exist_ok=True)
 
-            # Envia la información a Demeter u realiza otras acciones necesarias
-            # ...
+        # Guarda la imagen en el directorio correspondiente
+        file_path = os.path.join(user_dir, file_name)
+        photo.get_file().download(file_path)
 
-            # Devuelve la misma imagen como respuesta
-            update.message.reply_photo(photo.file_id)
-            print("Imagen guardada exitosamente")
+        # Envia la información a Demeter
+        files_to_sent = {
+            'file': (
+                file_name,
+                open
+                (file_path,
+                 'rb'
+                 ),
+                'image/'+file_extension
+            )}
+
+        json_data = {"melisa": MELISA_NAME, "token": TOKEN_DEMETER,
+                     "user": sender_id, "chat_id": ext_id, "message": "", "kind": "img"}
+
+
+        r = requests.post(DEMETER_URL, data=json_data, json=json_data,
+                          files=files_to_sent)
+
+        # Manejo de errores
+        if r.status_code == 200:
+            print("Solicitud exitosa")
+        else:
+            print(f"Error en la solicitud. Código de estado: {r.status_code}")
+            # Esto imprimirá el cuerpo de la respuesta, que puede contener información sobre el error
+            print(r.text)
+
+        # Devuelve la misma imagen como respuesta
+        # update.message.reply_photo(photo.file_id)
+        print("Imagen guardada exitosamente")
 
     except Exception as e:
         print(f"Error: {e}")
 
+
 @app.route('/')
 def index():
     return '<h1>Running MelisaBot for Telegram</h1>'
+
 
 @app.route('/set_webhook', methods=['GET', 'POST'])
 def set_webhook():
@@ -69,6 +98,7 @@ def set_webhook():
         return "webhook setup ok"
     else:
         return "webhook setup failed"
+
 
 @app.route('/{}'.format(TOKEN), methods=['POST'])
 def respond():
@@ -81,19 +111,21 @@ def respond():
     try:
         if update.message.photo:
             # Llama a la función para manejar imágenes
-            handle_image(update, None)
+            handle_image(update, sender_id, ext_id, None)
         else:
             # Procesa mensajes de texto
             text = update.message.text.encode('utf-8').decode()
             text = re.sub(r"\W", "_", text)
             if text != "/start":
-                json_data = {"melisa": MELISA_NAME, "token": TOKEN_DEMETER, "user": sender_id, "chat_id": ext_id, "message": text}
-                r = requests.post(DEMETER_URL, json=json_data)
+                json_data = {"melisa": MELISA_NAME, "token": TOKEN_DEMETER,
+                             "user": sender_id, "chat_id": ext_id, "message": text, "kind": "text"}
+                r = requests.post(DEMETER_URL, data=json_data)
 
     except Exception as e:
         print(f"Error: {e}")
 
     return Response('ok', 200)
+
 
 @app.route("/receptor", methods=['POST'])
 def receptor():
@@ -107,12 +139,14 @@ def receptor():
     if token == TOKEN_DEMETER:
         for m in messages:
             if first and chat_id is not None:
-                bot.sendMessage(chat_id=sender_id, text=m, reply_to_message_id=chat_id)
+                bot.sendMessage(chat_id=sender_id, text=m,
+                                reply_to_message_id=chat_id)
                 first = False
             else:
                 bot.sendMessage(chat_id=sender_id, text=m)
 
     return Response('ok', 200)
+
 
 if __name__ == '__main__':
     with open(FILE_TOKEN_DEMETER, "r") as f:
@@ -123,3 +157,6 @@ if __name__ == '__main__':
     # app.run(threaded=True, port=5000)
     app.run(host='0.0.0.0', port=5001)
     print("Start server on PORT 5001")
+
+# Run in background
+# nohup python3 melisa.py > melisa.log 2>&1 &
